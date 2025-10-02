@@ -1,0 +1,51 @@
+volumes:
+  # the name of a volume to be used to store the database folder
+  # the same is used at "- ./app_x_mssql_data:/var/lib/mssql"
+  app_x_mssql_data:
+    driver: local
+services:
+  app_x_mssql_service:
+    image: mcr.microsoft.com/mssql/server
+    container_name: app_x_mssql_database
+    restart: always
+    ports:
+      - ${MSSQL_PORT}:1433
+    expose:
+      # Opens port 3306 on the container
+      - ${MSSQL_PORT}
+    environment:
+      - ACCEPT_EULA=${ACCEPT_EULA}
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      # the location of the database folder
+      - ./app_x_mssql_data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P example_123 -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      retries: 10
+      start_period: 10s
+      timeout: 3s
+
+  app_x_mssql_database_flyway_migrations:
+    container_name: app_x_mssql_database_flyway_migrations
+    environment:
+      - FLYWAY_USER=${MSSQL_USER}
+      - FLYWAY_PASSWORD=${MSSQL_SA_PASSWORD}
+      - FLYWAY_URL=jdbc:jtds:sqlserver://app_x_mssql_service:${MSSQL_PORT}/${MSSQL_DB}
+      - FLYWAY_SCHEMAS=flyway
+      - FLYWAY_GROUP=true
+    volumes:
+      - $PWD/migrations:/flyway/sql
+    image: flyway/flyway:latest
+    command: -locations=filesystem:/flyway/sql -connectRetries=60 migrate
+    env_file:
+      - .env
+    depends_on:
+      app_x_mssql_service:
+        condition: service_healthy

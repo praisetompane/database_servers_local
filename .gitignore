@@ -1,3 +1,9 @@
+#mysql
 app_x_mysql_data
+
+#postgres
 app_x_postgres_data
 .DS_Store
+
+# mssql
+app_x_mssql_data

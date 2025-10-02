@@ -1,0 +1,1 @@
+CREATE SCHEMA app_x_schema;
