@@ -6,4 +6,4 @@ app_x_postgres_data
 .DS_Store
 
 # mssql
-app_x_mssql_data
+mssql_server_local

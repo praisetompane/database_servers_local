@@ -4,48 +4,57 @@ volumes:
   app_x_mssql_data:
     driver: local
 services:
-  app_x_mssql_service:
+  mssql_server_local:
     image: mcr.microsoft.com/mssql/server
-    container_name: app_x_mssql_database
+    container_name: mssql_server_local
     restart: always
+    env_file:
+      - .env
     ports:
       - ${MSSQL_PORT}:1433
     expose:
       # Opens port 3306 on the container
       - ${MSSQL_PORT}
-    environment:
-      - ACCEPT_EULA=${ACCEPT_EULA}
-      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
-    env_file:
-      - .env
     volumes:
       # the location of the database folder
-      - ./app_x_mssql_data:/var/opt/mssql
+      - ./mssql_server_local:/var/opt/mssql
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P example_123 -Q 'SELECT 1' || exit 1",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U ${MSSQL_SA_USER} -P ${MSSQL_SA_PASSWORD} -Q 'SELECT 1' || exit 1",
         ]
       interval: 10s
       retries: 10
       start_period: 10s
       timeout: 3s
 
-  app_x_mssql_database_flyway_migrations:
-    container_name: app_x_mssql_database_flyway_migrations
-    environment:
-      - FLYWAY_USER=${MSSQL_USER}
-      - FLYWAY_PASSWORD=${MSSQL_SA_PASSWORD}
-      - FLYWAY_URL=jdbc:jtds:sqlserver://app_x_mssql_service:${MSSQL_PORT}/${MSSQL_DB}
-      - FLYWAY_SCHEMAS=flyway
-      - FLYWAY_GROUP=true
-    volumes:
-      - $PWD/migrations:/flyway/sql
-    image: flyway/flyway:latest
-    command: -locations=filesystem:/flyway/sql -connectRetries=60 migrate
+  initialize-database:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: initialize-database
+    restart: no
     env_file:
       - .env
+    command: "/opt/mssql-tools/bin/sqlcmd -C -S ${MSSQL_HOST} -U ${MSSQL_SA_USER} -P ${MSSQL_SA_PASSWORD} -i /tmp/mssql-init.sql"
+    volumes:
+      - ./mssql-init.sql:/tmp/mssql-init.sql
     depends_on:
-      app_x_mssql_service:
+      mssql_server_local:
         condition: service_healthy
+
+  app_x_database_migrations:
+    image: flyway/flyway:latest
+    container_name: app_x_database_migrations
+    env_file:
+      - .env
+    environment:
+      - FLYWAY_USER=${MSSQL_SA_USER}
+      - FLYWAY_PASSWORD=${MSSQL_SA_PASSWORD}
+      - FLYWAY_URL=jdbc:jtds:sqlserver://${MSSQL_HOST}:${MSSQL_PORT}/${MSSQL_DB}
+      - FLYWAY_SCHEMAS=flyway
+      - FLYWAY_GROUP=true
+    command: -locations=filesystem:/flyway/sql -connectRetries=60 migrate
+    volumes:
+      - $PWD/migrations:/flyway/sql
+    depends_on:
+      - initialize-database

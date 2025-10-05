@@ -3,6 +3,15 @@ name: database_servers_local
 on: [push]
 
 jobs:
+  test_mssql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: test mssql
+        run: |
+          cd mssql
+          ./start_system.sh
+
   test_mysql:
     runs-on: ubuntu-latest
     steps:
@@ -11,6 +20,7 @@ jobs:
         run: |
           cd mysql
           ./start_system.sh
+
   test_postgres:
     runs-on: ubuntu-latest
     steps:
